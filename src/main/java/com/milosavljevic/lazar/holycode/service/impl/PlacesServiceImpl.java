@@ -15,6 +15,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -59,16 +60,16 @@ public class PlacesServiceImpl implements PlacesService {
   }
 
   private Map<String, List<WorkingHourSlot>> reduceWorkingHours(Map<String, List<WorkingHourSlot>> initial) {
-    Map<String, List<WorkingHourSlot>> result = new HashMap<>();
+    Map<String, List<WorkingHourSlot>> result = new LinkedHashMap<>();
     String streakStart = null, streakEnd = null;
     List<WorkingHourSlot> streakHours = null;
     for (String workingDay : days) {
       List<WorkingHourSlot> workingHourSlots = initial.get(workingDay);
       if (workingHourSlots == null) {
-        result.put(workingDay, null);
         if (streakStart != null) {
           result.put((streakStart.equals(streakEnd)) ? streakStart : streakStart + " - " + streakEnd , streakHours);
         }
+        result.put(workingDay, null);
         streakStart = null;
         streakEnd = null;
         streakHours = null;
