@@ -14,10 +14,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.*;
 
 @Service
 @Setter
@@ -50,6 +50,7 @@ public class PlacesServiceImpl implements PlacesService {
       sendPlaceDto.setName(fetchPlaceDto.getDisplayedWhat());
       sendPlaceDto.setId(fetchPlaceDto.getId());
       sendPlaceDto.setWorkingHours(reduceWorkingHours(fetchPlaceDto.getWorkingHours()));
+      sendPlaceDto.setOpen(isPlaceOpen(fetchPlaceDto));
       return sendPlaceDto;
     } catch (HttpClientErrorException ex) {
       if (ex.getStatusCode().equals(HttpStatus.NOT_FOUND)) {
@@ -106,6 +107,27 @@ public class PlacesServiceImpl implements PlacesService {
       }
     }
     return true;
+  }
+
+  private boolean isPlaceOpen(FetchPlaceDto fetchPlaceDto) {
+    LocalDateTime nowDateTime = LocalDate.now().atTime(13, 0);
+    String dayOfTheWeek = nowDateTime.getDayOfWeek().toString().toLowerCase(Locale.ROOT);
+    List<WorkingHourSlot> slots = fetchPlaceDto.getWorkingHours().get(dayOfTheWeek);
+    if (slots != null) {
+      for (WorkingHourSlot slot : slots) {
+        LocalTime startTime = LocalTime.parse(slot.getStart());
+        LocalTime endTime =  LocalTime.parse(slot.getEnd());
+        LocalDateTime startDateTime = nowDateTime.toLocalDate().atTime(startTime);
+        LocalDateTime endDateTime = nowDateTime.toLocalDate().atTime(endTime);
+        if (endTime.compareTo(startTime) < 0) {
+          endDateTime = endDateTime.plusDays(1);
+        }
+        if (!nowDateTime.isBefore(startDateTime) && nowDateTime.isBefore(endDateTime)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
 }

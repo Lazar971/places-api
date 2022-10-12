@@ -13,4 +13,5 @@ public class SendPlaceDto {
   private String name;
   private String address;
   private Map<String, List<WorkingHourSlot>> workingHours;
+  private boolean open;
 }
