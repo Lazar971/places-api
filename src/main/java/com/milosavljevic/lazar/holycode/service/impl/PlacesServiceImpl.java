@@ -50,7 +50,14 @@ public class PlacesServiceImpl implements PlacesService {
       sendPlaceDto.setName(fetchPlaceDto.getDisplayedWhat());
       sendPlaceDto.setId(fetchPlaceDto.getId());
       sendPlaceDto.setWorkingHours(reduceWorkingHours(fetchPlaceDto.getWorkingHours()));
-      sendPlaceDto.setOpen(isPlaceOpen(fetchPlaceDto));
+      getCurrentSlot(fetchPlaceDto)
+        .ifPresentOrElse(val -> {
+          sendPlaceDto.setOpen(true);
+          sendPlaceDto.setClosingTime(val.getEnd());
+        }, () -> {
+          sendPlaceDto.setOpen(false);
+          getNextSlot(fetchPlaceDto).ifPresent(val -> sendPlaceDto.setOpeningTime(val.toString()));
+        });
       return sendPlaceDto;
     } catch (HttpClientErrorException ex) {
       if (ex.getStatusCode().equals(HttpStatus.NOT_FOUND)) {
@@ -109,25 +116,51 @@ public class PlacesServiceImpl implements PlacesService {
     return true;
   }
 
-  private boolean isPlaceOpen(FetchPlaceDto fetchPlaceDto) {
-    LocalDateTime nowDateTime = LocalDate.now().atTime(13, 0);
+  private Optional<WorkingHourSlot> getCurrentSlot(FetchPlaceDto fetchPlaceDto) {
+    LocalDateTime nowDateTime = getNow();
     String dayOfTheWeek = nowDateTime.getDayOfWeek().toString().toLowerCase(Locale.ROOT);
     List<WorkingHourSlot> slots = fetchPlaceDto.getWorkingHours().get(dayOfTheWeek);
     if (slots != null) {
+
+     return slots
+        .stream()
+        .filter(slot -> {
+          LocalTime startTime = LocalTime.parse(slot.getStart());
+          LocalTime endTime =  LocalTime.parse(slot.getEnd());
+          LocalDateTime startDateTime = nowDateTime.toLocalDate().atTime(startTime);
+          LocalDateTime endDateTime = nowDateTime.toLocalDate().atTime(endTime);
+          if (endTime.compareTo(startTime) < 0) {
+            endDateTime = endDateTime.plusDays(1);
+          }
+          return !nowDateTime.isBefore(startDateTime) && nowDateTime.isBefore(endDateTime);
+        })
+       .findFirst();
+    }
+    return Optional.empty();
+  }
+
+  private Optional<LocalDateTime> getNextSlot(FetchPlaceDto fetchPlaceDto) {
+    LocalDateTime nowDateTime = getNow();
+    final LocalDate date = nowDateTime.toLocalDate();
+    for (int i = 0; i <= 7; i++) {
+      LocalDate datePom = date.plusDays(i);
+      String dayOfTheWeek = datePom.getDayOfWeek().toString().toLowerCase(Locale.ROOT);
+      List<WorkingHourSlot> slots = fetchPlaceDto.getWorkingHours().get(dayOfTheWeek);
+      if (slots == null) {
+        continue;
+      }
       for (WorkingHourSlot slot : slots) {
-        LocalTime startTime = LocalTime.parse(slot.getStart());
-        LocalTime endTime =  LocalTime.parse(slot.getEnd());
-        LocalDateTime startDateTime = nowDateTime.toLocalDate().atTime(startTime);
-        LocalDateTime endDateTime = nowDateTime.toLocalDate().atTime(endTime);
-        if (endTime.compareTo(startTime) < 0) {
-          endDateTime = endDateTime.plusDays(1);
-        }
-        if (!nowDateTime.isBefore(startDateTime) && nowDateTime.isBefore(endDateTime)) {
-          return true;
+        LocalDateTime startTime = datePom.atTime(LocalTime.parse(slot.getStart()));
+        if (nowDateTime.isBefore(startTime)) {
+          return Optional.of(startTime);
         }
       }
     }
-    return false;
+    return Optional.empty();
+  }
+
+  public LocalDateTime getNow() {
+    return LocalDateTime.of(2022, 10, 16, 16, 0);
   }
 
 }
